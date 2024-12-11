@@ -71,7 +71,7 @@
 		"node": ">=18"
 	},
 	"dependencies": {
-		"@sofie-automation/server-core-integration": "1.51.0",
+		"@sofie-automation/server-core-integration": "patch:@sofie-automation/server-core-integration@npm%3A1.51.0#~/.yarn/patches/@sofie-automation-server-core-integration-npm-1.51.0-2af53c37e8.patch",
 		"@sofie-automation/shared-lib": "1.51.0"
 	},
 	"prettier": "@sofie-automation/code-standard-preset/.prettierrc.json",

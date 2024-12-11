@@ -2127,6 +2127,21 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@sofie-automation/server-core-integration@patch:@sofie-automation/server-core-integration@npm%3A1.51.0#~/.yarn/patches/@sofie-automation-server-core-integration-npm-1.51.0-2af53c37e8.patch":
+  version: 1.51.0
+  resolution: "@sofie-automation/server-core-integration@patch:@sofie-automation/server-core-integration@npm%3A1.51.0#~/.yarn/patches/@sofie-automation-server-core-integration-npm-1.51.0-2af53c37e8.patch::version=1.51.0&hash=1fb3c6"
+  dependencies:
+    "@sofie-automation/shared-lib": "npm:1.51.0"
+    ejson: "npm:^2.2.3"
+    eventemitter3: "npm:^4.0.7"
+    faye-websocket: "npm:^0.11.4"
+    got: "npm:^11.8.6"
+    tslib: "npm:^2.6.2"
+    underscore: "npm:^1.13.6"
+  checksum: 10/8bf846bb8b2d0544555f032d41469c5c8f972f73b71f086dc0a4307209daee9e1531c9f03b3226ea85e8e73ef525cb54e367178589223376d8543f5af994617a
+  languageName: node
+  linkType: hard
+
 "@sofie-automation/shared-lib@npm:1.51.0":
   version: 1.51.0
   resolution: "@sofie-automation/shared-lib@npm:1.51.0"
@@ -2143,6 +2158,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@sofie-package-manager/api@workspace:shared/packages/api"
   dependencies:
+    "@types/underscore": "npm:^1.10.24"
     "@types/winston": "npm:^2.3.9"
     "@types/ws": "npm:^8.5.4"
     jest: "npm:*"
@@ -10600,7 +10616,7 @@ __metadata:
   resolution: "package-manager-monorepo@workspace:."
   dependencies:
     "@sofie-automation/code-standard-preset": "npm:^2.5.1"
-    "@sofie-automation/server-core-integration": "npm:1.51.0"
+    "@sofie-automation/server-core-integration": "patch:@sofie-automation/server-core-integration@npm%3A1.51.0#~/.yarn/patches/@sofie-automation-server-core-integration-npm-1.51.0-2af53c37e8.patch"
     "@sofie-automation/shared-lib": "npm:1.51.0"
     "@types/jest": "npm:^29.2.5"
     "@types/rimraf": "npm:^3.0.0"
