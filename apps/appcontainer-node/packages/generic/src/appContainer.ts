@@ -320,8 +320,8 @@ export class AppContainer {
 			]
 		}
 		if (
-			process.execPath.endsWith('node.exe') || // windows
-			process.execPath.endsWith('node') // linux
+			process.execPath.endsWith(path.sep + 'node.exe') || // windows
+			process.execPath.endsWith(path.sep + 'node') // linux
 		) {
 			// Process runs as a node process, we're probably in development mode.
 			const appType = protectString<AppType>('worker')
