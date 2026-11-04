@@ -1,5 +1,3 @@
-// eslint-disable-next-line node/no-extraneous-import
-import { ExpectedPackageStatusAPI } from '@sofie-automation/shared-lib/dist/package-manager/package'
 import {
 	diff,
 	ExpectationId,
@@ -8,17 +6,20 @@ import {
 	objectEntries,
 	objectSize,
 	Reason,
+	startTimer,
 	StatusCode,
 	stringifyError,
-	startTimer,
 } from '@sofie-package-manager/api'
 import { PromisePool } from '@supercharge/promise-pool'
 import _ from 'underscore'
-import { evaluateExpectationState } from './evaluateExpectationState'
-import { InternalManager } from '../internalManager/internalManager'
-import { ExpectationTracker } from '../expectationTracker/expectationTracker'
-import { expLabel, getDefaultTrackedExpectation, TrackedExpectation } from '../lib/trackedExpectation'
-import { TrackedPackageContainerExpectation } from '../lib/trackedPackageContainerExpectation'
+
+import { ExpectedPackageStatusAPI } from '@sofie-automation/shared-lib/dist/package-manager/package'
+
+import { ExpectationTracker } from '../expectationTracker/expectationTracker.js'
+import { InternalManager } from '../internalManager/internalManager.js'
+import { expLabel, getDefaultTrackedExpectation, TrackedExpectation } from '../lib/trackedExpectation.js'
+import { TrackedPackageContainerExpectation } from '../lib/trackedPackageContainerExpectation.js'
+import { evaluateExpectationState } from './evaluateExpectationState.js'
 
 /**
  * The EvaluationRunner goes through one pass of evaluation of expectations.
@@ -32,7 +33,11 @@ export class EvaluationRunner {
 	public logger: LoggerInstance
 	private instanceId: number
 
-	constructor(logger: LoggerInstance, public manager: InternalManager, public tracker: ExpectationTracker) {
+	constructor(
+		logger: LoggerInstance,
+		public manager: InternalManager,
+		public tracker: ExpectationTracker
+	) {
 		this.instanceId = EvaluationRunner.instanceId++
 		this.logger = logger.category(`Runner_${this.instanceId}`)
 	}
@@ -440,6 +445,7 @@ export class EvaluationRunner {
 					packageContainer: packageContainer,
 					currentWorker: null,
 					waitingForWorkerTime: null,
+					noWorkerSince: null,
 					isUpdated: true,
 					removed: false,
 					lastEvaluationTime: 0,
@@ -575,6 +581,7 @@ export class EvaluationRunner {
 							// Lost connection to the worker & monitor
 						}
 						trackedPackageContainer.currentWorker = null
+						trackedPackageContainer.monitorIsSetup = false
 					}
 					trackedPackageContainer.isUpdated = false
 				}
@@ -583,12 +590,15 @@ export class EvaluationRunner {
 					// Check that the worker still exists:
 					if (!this.manager.workerAgents.get(trackedPackageContainer.currentWorker)) {
 						trackedPackageContainer.currentWorker = null
+						trackedPackageContainer.monitorIsSetup = false
 					}
 				}
 				if (!trackedPackageContainer.currentWorker) {
 					// Find a worker that supports this PackageContainer
 
 					let notSupportReason: Reason | null = null
+					/** Whether notSupportReason is due to no suitable worker being available at this moment */
+					let noWorkerAvailable = false
 					await Promise.all(
 						this.manager.workerAgents.list().map<Promise<void>>(async ({ workerId, workerAgent }) => {
 							if (!workerAgent.connected) return
@@ -596,17 +606,19 @@ export class EvaluationRunner {
 							const support = await workerAgent.api.doYouSupportPackageContainer(
 								trackedPackageContainer.packageContainer
 							)
-							if (!trackedPackageContainer.currentWorker) {
-								if (support.support) {
+							if (support.support) {
+								if (!trackedPackageContainer.currentWorker) {
 									trackedPackageContainer.currentWorker = workerId
-								} else {
-									notSupportReason = support.reason
 								}
+								notSupportReason = null
+							} else if (!trackedPackageContainer.currentWorker) {
+								notSupportReason = support.reason
 							}
 						})
 					)
 					if (objectSize(trackedPackageContainer.packageContainer.accessors) > 0) {
 						if (!trackedPackageContainer.currentWorker) {
+							noWorkerAvailable = true
 							if (this.manager.workerAgents.list().length) {
 								notSupportReason = {
 									user: 'Found no worker that supports this packageContainer',
@@ -633,6 +645,24 @@ export class EvaluationRunner {
 								trackedPackageContainer.id
 							}": ${JSON.stringify(notSupportReason)}`
 						)
+						// Workers are spun up and down as a matter of course, which briefly leaves a
+						// PackageContainer without one. Reporting that immediately surfaces a routine worker
+						// restart to the user as an error, so hold off until it has persisted for a while:
+						if (noWorkerAvailable) {
+							if (!trackedPackageContainer.noWorkerSince) {
+								trackedPackageContainer.noWorkerSince = Date.now()
+							}
+							const withoutWorkerFor = Date.now() - trackedPackageContainer.noWorkerSince
+							if (withoutWorkerFor < this.tracker.constants.WORKER_UNAVAILABLE_GRACE_TIME) {
+								this.logger.debug(
+									`_evaluateAllTrackedPackageContainers: No worker available for "${trackedPackageContainer.id}" (for ${withoutWorkerFor}ms), keeping the previous status for now`
+								)
+								continue // Break further execution, leaving the status untouched
+							}
+						} else {
+							trackedPackageContainer.noWorkerSince = null
+						}
+
 						this.tracker.trackedPackageContainerAPI.updateTrackedPackageContainerStatus(
 							trackedPackageContainer,
 							StatusCode.BAD,
@@ -644,6 +674,8 @@ export class EvaluationRunner {
 						continue // Break further execution for this PackageContainer
 					}
 				}
+				// A worker is in place, so reset the grace timer:
+				trackedPackageContainer.noWorkerSince = null
 
 				if (trackedPackageContainer.currentWorker) {
 					const workerAgent = this.manager.workerAgents.get(trackedPackageContainer.currentWorker)
